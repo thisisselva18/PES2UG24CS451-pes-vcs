@@ -176,6 +176,8 @@ static int read_index_for_tree(TIndex *tidx) {
     return 0;
 }
 
+static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out);
+
 static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out) {
     Tree tree;
     tree.count = 0;
@@ -198,7 +200,34 @@ static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out)
             continue;
         }
 
-        return -1;  // directory handling not yet implemented
+        size_t dir_len = (size_t)(slash - rest);
+        if (dir_len == 0 || dir_len >= 256) return -1;
+
+        char dir_name[256];
+        memcpy(dir_name, rest, dir_len);
+        dir_name[dir_len] = '\0';
+
+        int found = 0;
+        for (int j = 0; j < tree.count; j++) {
+            if (tree.entries[j].mode == MODE_DIR &&
+                strcmp(tree.entries[j].name, dir_name) == 0) {
+                found = 1;
+                break;
+            }
+        }
+        if (found) continue;
+
+        char sub_prefix[1024];
+        snprintf(sub_prefix, sizeof(sub_prefix), "%s%s/", prefix, dir_name);
+
+        ObjectID sub_id;
+        if (build_level(tidx, sub_prefix, &sub_id) != 0) return -1;
+
+        if (tree.count >= MAX_TREE_ENTRIES) return -1;
+        TreeEntry *entry = &tree.entries[tree.count++];
+        entry->mode = MODE_DIR;
+        entry->hash = sub_id;
+        snprintf(entry->name, sizeof(entry->name), "%s", dir_name);
     }
 
     (void)id_out;
