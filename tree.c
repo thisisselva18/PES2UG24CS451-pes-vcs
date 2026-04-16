@@ -176,13 +176,41 @@ static int read_index_for_tree(TIndex *tidx) {
     return 0;
 }
 
+static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out) {
+    Tree tree;
+    tree.count = 0;
+
+    size_t pfx_len = strlen(prefix);
+    for (int i = 0; i < tidx->count; i++) {
+        const char *path = tidx->entries[i].path;
+        if (pfx_len > 0 && strncmp(path, prefix, pfx_len) != 0) continue;
+
+        const char *rest = path + pfx_len;
+        if (rest[0] == '\0') continue;
+
+        const char *slash = strchr(rest, '/');
+        if (!slash) {
+            if (tree.count >= MAX_TREE_ENTRIES) return -1;
+            TreeEntry *entry = &tree.entries[tree.count++];
+            entry->mode = tidx->entries[i].mode;
+            entry->hash = tidx->entries[i].hash;
+            snprintf(entry->name, sizeof(entry->name), "%s", rest);
+            continue;
+        }
+
+        return -1;  // directory handling not yet implemented
+    }
+
+    (void)id_out;
+    return -1;
+}
+
 // Build a tree hierarchy from the current index and write all tree
 // objects to the object store.
 //
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
     // TODO: Implement recursive tree building
-    // (See Lab Appendix for logical steps)
     (void)id_out;
     return -1;
 }
