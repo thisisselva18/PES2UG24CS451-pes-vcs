@@ -208,6 +208,10 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     size_t cbuf_len = 0;
     if (commit_serialize(&cm, &cbuf, &cbuf_len) != 0) return -1;
 
+    int ret = object_write(OBJ_COMMIT, cbuf, cbuf_len, commit_id_out);
     free(cbuf);
-    return -1;
+    if (ret != 0) return -1;
+
+    if (head_update(commit_id_out) != 0) return -1;
+    return 0;
 }
