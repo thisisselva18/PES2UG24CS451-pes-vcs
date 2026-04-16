@@ -176,8 +176,6 @@ static int read_index_for_tree(TIndex *tidx) {
     return 0;
 }
 
-static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out);
-
 static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out) {
     Tree tree;
     tree.count = 0;
@@ -230,8 +228,15 @@ static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out)
         snprintf(entry->name, sizeof(entry->name), "%s", dir_name);
     }
 
-    (void)id_out;
-    return -1;
+    if (tree.count == 0) return -1;
+
+    void *tdata = NULL;
+    size_t tlen = 0;
+    if (tree_serialize(&tree, &tdata, &tlen) != 0) return -1;
+
+    int ret = object_write(OBJ_TREE, tdata, tlen, id_out);
+    free(tdata);
+    return ret;
 }
 
 // Build a tree hierarchy from the current index and write all tree
