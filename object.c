@@ -140,8 +140,54 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     char obj_path[512];
     object_path(id_out, obj_path, sizeof(obj_path));
 
+    char tmp_file[640];
+    snprintf(tmp_file, sizeof(tmp_file), "%s/.tmp-XXXXXX", shard_path);
+
+    int fd = mkstemp(tmp_file);
+    if (fd < 0) {
+        free(obj_buf);
+        return -1;
+    }
+
+    size_t bytes_written = 0;
+    while (bytes_written < obj_len) {
+        ssize_t n = write(fd, obj_buf + bytes_written, obj_len - bytes_written);
+        if (n < 0) {
+            close(fd);
+            unlink(tmp_file);
+            free(obj_buf);
+            return -1;
+        }
+        bytes_written += (size_t)n;
+    }
+
+    if (fsync(fd) != 0) {
+        close(fd);
+        unlink(tmp_file);
+        free(obj_buf);
+        return -1;
+    }
+
+    if (close(fd) != 0) {
+        unlink(tmp_file);
+        free(obj_buf);
+        return -1;
+    }
+
+    if (rename(tmp_file, obj_path) != 0) {
+        unlink(tmp_file);
+        free(obj_buf);
+        return -1;
+    }
+
+    int dir_fd = open(shard_path, O_RDONLY | O_DIRECTORY);
+    if (dir_fd >= 0) {
+        (void)fsync(dir_fd);
+        close(dir_fd);
+    }
+
     free(obj_buf);
-    return -1;
+    return 0;
 }
 
 // Read an object from the store.
