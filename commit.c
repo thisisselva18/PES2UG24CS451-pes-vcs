@@ -204,5 +204,10 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     cm.timestamp = (uint64_t)time(NULL);
     snprintf(cm.message, sizeof(cm.message), "%s", message);
 
+    void *cbuf = NULL;
+    size_t cbuf_len = 0;
+    if (commit_serialize(&cm, &cbuf, &cbuf_len) != 0) return -1;
+
+    free(cbuf);
     return -1;
 }
