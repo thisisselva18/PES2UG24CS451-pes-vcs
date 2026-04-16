@@ -244,7 +244,11 @@ static int build_level(const TIndex *tidx, const char *prefix, ObjectID *id_out)
 //
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
-    // TODO: Implement recursive tree building
-    (void)id_out;
-    return -1;
+    if (!id_out) return -1;
+
+    TIndex tidx;
+    if (read_index_for_tree(&tidx) != 0) return -1;
+    if (tidx.count == 0) return -1;
+
+    return build_level(&tidx, "", id_out);
 }
