@@ -186,9 +186,63 @@ int index_load(Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_save(const Index *index) {
-    // TODO: Implement atomic index saving
-    (void)index;
-    return -1;
+    if (!index) return -1;
+
+    IndexEntry *tmp_entries = NULL;
+    if (index->count > 0) {
+        tmp_entries = malloc((size_t)index->count * sizeof(IndexEntry));
+        if (!tmp_entries) return -1;
+        memcpy(tmp_entries, index->entries, (size_t)index->count * sizeof(IndexEntry));
+        qsort(tmp_entries, index->count, sizeof(IndexEntry), cmp_index_paths);
+    }
+
+    char tmp_idx_path[512];
+    snprintf(tmp_idx_path, sizeof(tmp_idx_path), "%s.tmp", INDEX_FILE);
+
+    FILE *fp = fopen(tmp_idx_path, "w");
+    if (!fp) {
+        free(tmp_entries);
+        return -1;
+    }
+
+    for (int i = 0; i < index->count; i++) {
+        char hex_str[HASH_HEX_SIZE + 1];
+        hash_to_hex(&tmp_entries[i].hash, hex_str);
+        if (fprintf(fp, "%o %s %" PRIu64 " %u %s\n",
+                    tmp_entries[i].mode,
+                    hex_str,
+                    tmp_entries[i].mtime_sec,
+                    tmp_entries[i].size,
+                    tmp_entries[i].path) < 0) {
+            free(tmp_entries);
+            fclose(fp);
+            unlink(tmp_idx_path);
+            return -1;
+        }
+    }
+
+    fflush(fp);
+    if (fsync(fileno(fp)) != 0) {
+        free(tmp_entries);
+        fclose(fp);
+        unlink(tmp_idx_path);
+        return -1;
+    }
+
+    if (fclose(fp) != 0) {
+        free(tmp_entries);
+        unlink(tmp_idx_path);
+        return -1;
+    }
+
+    if (rename(tmp_idx_path, INDEX_FILE) != 0) {
+        free(tmp_entries);
+        unlink(tmp_idx_path);
+        return -1;
+    }
+
+    free(tmp_entries);
+    return 0;
 }
 
 // Stage a file for the next commit.
