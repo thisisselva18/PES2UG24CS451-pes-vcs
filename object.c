@@ -110,6 +110,18 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     if (hdr_written < 0 || (size_t)hdr_written >= sizeof(hdr_buf) - 1) return -1;
     size_t hdr_len = (size_t)hdr_written + 1;
 
+    size_t obj_len = hdr_len + len;
+    uint8_t *obj_buf = malloc(obj_len);
+    if (!obj_buf) return -1;
+    memcpy(obj_buf, hdr_buf, hdr_len);
+    if (len > 0) memcpy(obj_buf + hdr_len, data, len);
+
+    compute_hash(obj_buf, obj_len, id_out);
+    if (object_exists(id_out)) {
+        free(obj_buf);
+        return 0;
+    }
+
     return -1;
 }
 
