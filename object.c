@@ -122,6 +122,25 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         return 0;
     }
 
+    if (mkdir(OBJECTS_DIR, 0755) != 0 && errno != EEXIST) {
+        free(obj_buf);
+        return -1;
+    }
+
+    char hex_str[HASH_HEX_SIZE + 1];
+    hash_to_hex(id_out, hex_str);
+
+    char shard_path[512];
+    snprintf(shard_path, sizeof(shard_path), "%s/%.2s", OBJECTS_DIR, hex_str);
+    if (mkdir(shard_path, 0755) != 0 && errno != EEXIST) {
+        free(obj_buf);
+        return -1;
+    }
+
+    char obj_path[512];
+    object_path(id_out, obj_path, sizeof(obj_path));
+
+    free(obj_buf);
     return -1;
 }
 
