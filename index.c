@@ -24,6 +24,9 @@
 #include <unistd.h>
 #include <dirent.h>
 
+// Forward declaration (implemented in object.c)
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
 
 // Find an index entry by path (linear scan).
@@ -249,7 +252,33 @@ int index_save(const Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_add(Index *index, const char *path) {
-    // TODO: Implement file staging
-    (void)index; (void)path;
-    return -1;
+    if (!index || !path) return -1;
+
+    struct stat st;
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) return -1;
+    if (st.st_size < 0 || (uint64_t)st.st_size > UINT32_MAX) return -1;
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return -1;
+
+    size_t data_len = (size_t)st.st_size;
+    size_t alloc_len = data_len > 0 ? data_len : 1;
+    void *data = malloc(alloc_len);
+    if (!data) { fclose(fp); return -1; }
+
+    if (data_len > 0 && fread(data, 1, data_len, fp) != data_len) {
+        free(data);
+        fclose(fp);
+        return -1;
+    }
+    fclose(fp);
+
+    ObjectID blob_id;
+    if (object_write(OBJ_BLOB, data, data_len, &blob_id) != 0) {
+        free(data);
+        return -1;
+    }
+    free(data);
+
+    return -1;  // entry update not yet implemented
 }
