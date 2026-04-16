@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <inttypes.h>
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -116,17 +118,66 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 
 // ─── TODO: Implement these ──────────────────────────────────────────────────
 
+// Forward declaration (implemented in object.c)
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+
+typedef struct {
+    uint32_t mode;
+    ObjectID hash;
+    char path[512];
+} TIndexEntry;
+
+typedef struct {
+    TIndexEntry entries[10000];
+    int count;
+} TIndex;
+
+static int read_index_for_tree(TIndex *tidx) {
+    if (!tidx) return -1;
+
+    tidx->count = 0;
+    FILE *fp = fopen(INDEX_FILE, "r");
+    if (!fp) {
+        if (errno == ENOENT) return 0;
+        return -1;
+    }
+
+    char line[2048];
+    while (fgets(line, sizeof(line), fp)) {
+        if (tidx->count >= (int)(sizeof(tidx->entries) / sizeof(tidx->entries[0]))) {
+            fclose(fp);
+            return -1;
+        }
+
+        TIndexEntry *ie = &tidx->entries[tidx->count];
+        char hex_str[HASH_HEX_SIZE + 1];
+        unsigned int mode;
+        unsigned long long mtime_ignored;
+        unsigned int size_ignored;
+        char path[sizeof(ie->path)];
+
+        if (sscanf(line, "%o %64s %llu %u %511[^\n]",
+                   &mode, hex_str, &mtime_ignored, &size_ignored, path) != 5) {
+            fclose(fp);
+            return -1;
+        }
+
+        if (hex_to_hash(hex_str, &ie->hash) != 0) {
+            fclose(fp);
+            return -1;
+        }
+
+        ie->mode = mode;
+        snprintf(ie->path, sizeof(ie->path), "%s", path);
+        tidx->count++;
+    }
+
+    fclose(fp);
+    return 0;
+}
+
 // Build a tree hierarchy from the current index and write all tree
 // objects to the object store.
-//
-// HINTS - Useful functions and concepts for this phase:
-//   - index_load      : load the staged files into memory
-//   - strchr          : find the first '/' in a path to separate directories from files
-//   - strncmp         : compare prefixes to group files belonging to the same subdirectory
-//   - Recursion       : you will likely want to create a recursive helper function 
-//                       (e.g., `write_tree_level(entries, count, depth)`) to handle nested dirs.
-//   - tree_serialize  : convert your populated Tree struct into a binary buffer
-//   - object_write    : save that binary buffer to the store as OBJ_TREE
 //
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
