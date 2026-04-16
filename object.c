@@ -105,6 +105,11 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         default: return -1;
     }
 
+    char hdr_buf[64];
+    int hdr_written = snprintf(hdr_buf, sizeof(hdr_buf), "%s %zu", type_name, len);
+    if (hdr_written < 0 || (size_t)hdr_written >= sizeof(hdr_buf) - 1) return -1;
+    size_t hdr_len = (size_t)hdr_written + 1;
+
     return -1;
 }
 
