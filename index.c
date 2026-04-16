@@ -280,5 +280,17 @@ int index_add(Index *index, const char *path) {
     }
     free(data);
 
-    return -1;  // entry update not yet implemented
+    IndexEntry *ie = index_find(index, path);
+    if (!ie) {
+        if (index->count >= MAX_INDEX_ENTRIES) return -1;
+        ie = &index->entries[index->count++];
+    }
+
+    ie->mode = (st.st_mode & S_IXUSR) ? 0100755 : 0100644;
+    ie->hash = blob_id;
+    ie->mtime_sec = (uint64_t)st.st_mtime;
+    ie->size = (uint32_t)st.st_size;
+    snprintf(ie->path, sizeof(ie->path), "%s", path);
+
+    return index_save(index);
 }
