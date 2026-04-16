@@ -116,10 +116,12 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
     return 0;
 }
 
-// ─── TODO: Implement these ──────────────────────────────────────────────────
+// ─── Forward declarations ────────────────────────────────────────────────────
 
 // Forward declaration (implemented in object.c)
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+
+// ─── TODO: Implement these ──────────────────────────────────────────────────
 
 typedef struct {
     uint32_t mode;
