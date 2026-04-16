@@ -137,9 +137,49 @@ static int cmp_index_paths(const void *a, const void *b) {
 //
 // Returns 0 on success, -1 on error.
 int index_load(Index *index) {
-    // TODO: Implement index loading
-    (void)index;
-    return -1;
+    if (!index) return -1;
+
+    index->count = 0;
+    FILE *fp = fopen(INDEX_FILE, "r");
+    if (!fp) {
+        if (errno == ENOENT) return 0;
+        return -1;
+    }
+
+    char line[2048];
+    while (fgets(line, sizeof(line), fp)) {
+        if (index->count >= MAX_INDEX_ENTRIES) {
+            fclose(fp);
+            return -1;
+        }
+
+        IndexEntry *ie = &index->entries[index->count];
+        char hex_str[HASH_HEX_SIZE + 1];
+        unsigned int mode;
+        unsigned long long mtime;
+        unsigned int sz;
+        char path[sizeof(ie->path)];
+
+        if (sscanf(line, "%o %64s %llu %u %511[^\n]",
+                   &mode, hex_str, &mtime, &sz, path) != 5) {
+            fclose(fp);
+            return -1;
+        }
+
+        if (hex_to_hash(hex_str, &ie->hash) != 0) {
+            fclose(fp);
+            return -1;
+        }
+
+        ie->mode = mode;
+        ie->mtime_sec = (uint64_t)mtime;
+        ie->size = sz;
+        snprintf(ie->path, sizeof(ie->path), "%s", path);
+        index->count++;
+    }
+
+    fclose(fp);
+    return 0;
 }
 
 // Save the index to .pes/index atomically.
